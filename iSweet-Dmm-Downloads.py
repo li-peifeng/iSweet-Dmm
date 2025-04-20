@@ -4,6 +4,8 @@ import sys
 import requests
 import tkinter as tk
 from tkinter import filedialog
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 # 配置请求头
 headers = {
@@ -36,38 +38,41 @@ def download_files(formatted_code, save_path, download_type):
     """根据下载类型下载并保存文件"""
     downloaded_files = set()
     session = requests.Session()
-    retries = requests.adapters.Retry(total=3, backoff_factor=1)
-    session.mount('https://', requests.adapters.HTTPAdapter(max_retries=retries))
+    retries = Retry(total=3, backoff_factor=1)
+    session.mount('https://', HTTPAdapter(max_retries=retries))
     
-    try:
-        os.makedirs(save_path, exist_ok=True)
-        tasks = []
+    os.makedirs(save_path, exist_ok=True)
+    tasks = []
+    error_messages = []
 
-        # 确定下载任务
-        if download_type in ['poster', 'all']:
-            tasks.append(('ps', ['poster.jpg']))
-        if download_type in ['dual', 'all']:
-            tasks.append(('pl', ['fanart.jpg', 'thumb.jpg']))
+    # 确定下载任务
+    if download_type in ['poster', 'all']:
+        tasks.append(('ps', ['poster.jpg']))
+    if download_type in ['dual', 'all']:
+        tasks.append(('pl', ['fanart.jpg', 'thumb.jpg']))
 
-        for url_suffix, file_names in tasks:
+    for url_suffix, file_names in tasks:
+        try:
             # 构建请求URL
             dmm_code = formatted_code.replace('-', '')
             url = f"https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/{dmm_code}/{dmm_code}{url_suffix}.jpg"
             
             # 发送请求
             response = session.get(url, headers=headers, timeout=15)
-            if response.status_code != 200:
-                raise requests.HTTPError(f"未找到此番号的封面图")
+            response.raise_for_status()  # 触发HTTP错误异常
+            
+            # 验证文件大小
             if len(response.content) < 30720:
-                raise ValueError("文件小于30KB，已丢弃")
+                raise ValueError(f"文件小于30KB，已丢弃: {url}")
 
             # 保存文件
             if url_suffix == 'pl':
-                with open(os.path.join(save_path, 'fanart.jpg'), 'wb') as f1, \
-                     open(os.path.join(save_path, 'thumb.jpg'), 'wb') as f2:
-                    for chunk in response.iter_content(1024 * 1024):  # 1MB chunks
-                        f1.write(chunk)
-                        f2.write(chunk)
+                fanart_path = os.path.join(save_path, 'fanart.jpg')
+                thumb_path = os.path.join(save_path, 'thumb.jpg')
+                content = response.content  # 先读取内容再写入
+                with open(fanart_path, 'wb') as f1, open(thumb_path, 'wb') as f2:
+                    f1.write(content)
+                    f2.write(content)
                 downloaded_files.update(['fanart.jpg', 'thumb.jpg'])
             else:
                 file_path = os.path.join(save_path, 'poster.jpg')
@@ -75,17 +80,27 @@ def download_files(formatted_code, save_path, download_type):
                     f.write(response.content)
                 downloaded_files.add('poster.jpg')
 
-        return True, save_path
+        except requests.exceptions.HTTPError as e:
+            error_messages.append(f"❌ 未找到此番号的封面图")
+            # 删除当前任务对应的文件
+            for fname in file_names:
+                file_path = os.path.join(save_path, fname)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+        except Exception as e:
+            error_messages.append(f"❌ 未找到此番号的封面图")
+            # 删除当前任务对应的文件
+            for fname in file_names:
+                file_path = os.path.join(save_path, fname)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
 
-    except Exception as e:
-        # 清理已下载文件
-        for fname in downloaded_files:
-            file_path = os.path.join(save_path, fname)
-            if os.path.exists(file_path):
-                os.remove(file_path)
+    # 最终清理空目录
+    if not downloaded_files:
         if os.path.exists(save_path) and not os.listdir(save_path):
             os.rmdir(save_path)
-        return False, str(e)
+        return False, error_messages
+    return True, error_messages
 
 def get_leaf_folders(path):
     """获取所有叶子文件夹路径"""
@@ -139,12 +154,15 @@ def process_auto_mode(download_type):
             print(f"❌ 番号格式无效: {raw_name}")
             continue
         
-        result, msg = download_files(formatted_code, folder_path, download_type)
+        result, errors = download_files(formatted_code, folder_path, download_type)
         if result:
             success_count += 1
-            print(f"✅ 成功！封面图已下载保存到: {folder_path}")
+            msg = f"✅ 成功！封面图已下载保存到: {folder_path}"
+            if errors:
+                msg += f"\n ⚠️ 部分失败: {', '.join(errors)}"
+            print(msg)
         else:
-            print(f"❌ 失败！下载失败: {msg}")
+            print(f"❌ 失败！下载失败: {', '.join(errors)}")
     
     print(f"\n✅ 自动模式完成 {success_count}/{total}")
     input("↩️ 返回主菜单...")
@@ -174,12 +192,15 @@ def process_manual_mode(download_type):
                 continue
             
             save_dir = os.path.join(os.getcwd(), "Thumb-Poster-Fanart", code)
-            result, msg = download_files(formatted_code, save_dir, download_type)
+            result, errors = download_files(formatted_code, save_dir, download_type)
             if result:
                 success_count += 1
-                print(f"✅ 成功！封面图已下载保存到: {save_dir}")
+                msg = f"✅ 成功！封面图已下载保存到: {save_dir}"
+                if errors:
+                    msg += f"\n ⚠️ 部分失败: {', '.join(errors)}"
+                print(msg)
             else:
-                print(f"❌ 失败！下载失败: {msg}")
+                print(f"❌ 失败！下载失败: {', '.join(errors)}")
         
         print(f"\n✅ 手动模式成功完成 {success_count}/{total}")
         input("↩️ 按回车继续...")
