@@ -35,8 +35,7 @@ def format_code(raw_code):
     return f"{letters}-{formatted_num}"
 
 def download_files(formatted_code, save_path, download_type):
-    """根据下载类型下载并保存文件"""
-    downloaded_files = set()
+    """根据下载类型下载并保存文件（内存优先方案）"""
     session = requests.Session()
     retries = Retry(total=3, backoff_factor=1)
     session.mount('https://', HTTPAdapter(max_retries=retries))
@@ -44,58 +43,48 @@ def download_files(formatted_code, save_path, download_type):
     os.makedirs(save_path, exist_ok=True)
     tasks = []
     error_messages = []
+    downloaded_files = set()
 
-    # 确定下载任务
+    # 配置下载任务
     if download_type in ['poster', 'all']:
         tasks.append(('ps', ['poster.jpg']))
     if download_type in ['dual', 'all']:
         tasks.append(('pl', ['fanart.jpg', 'thumb.jpg']))
 
     for url_suffix, file_names in tasks:
+        content = None
         try:
-            # 构建请求URL
+            # 获取下载内容到内存
             dmm_code = formatted_code.replace('-', '')
             url = f"https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/{dmm_code}/{dmm_code}{url_suffix}.jpg"
-            
-            # 发送请求
             response = session.get(url, headers=headers, timeout=15)
-            response.raise_for_status()  # 触发HTTP错误异常
+            response.raise_for_status()
             
-            # 验证文件大小
-            if len(response.content) < 30720:
+            # 内存校验
+            content = response.content
+            if len(content) < 30720:
                 raise ValueError(f"文件小于30KB，已丢弃: {url}")
 
-            # 保存文件
+            # 内存校验通过后写入磁盘
             if url_suffix == 'pl':
                 fanart_path = os.path.join(save_path, 'fanart.jpg')
                 thumb_path = os.path.join(save_path, 'thumb.jpg')
-                content = response.content  # 先读取内容再写入
                 with open(fanart_path, 'wb') as f1, open(thumb_path, 'wb') as f2:
                     f1.write(content)
                     f2.write(content)
                 downloaded_files.update(['fanart.jpg', 'thumb.jpg'])
             else:
-                file_path = os.path.join(save_path, 'poster.jpg')
-                with open(file_path, 'wb') as f:
-                    f.write(response.content)
+                poster_path = os.path.join(save_path, 'poster.jpg')
+                with open(poster_path, 'wb') as f:
+                    f.write(content)
                 downloaded_files.add('poster.jpg')
 
-        except requests.exceptions.HTTPError as e:
+        except requests.exceptions.HTTPError:
             error_messages.append(f"❌ 未找到此番号的封面图")
-            # 删除当前任务对应的文件
-            for fname in file_names:
-                file_path = os.path.join(save_path, fname)
-                if os.path.exists(file_path):
-                    os.remove(file_path)
         except Exception as e:
-            error_messages.append(f"❌ 未找到此番号的封面图")
-            # 删除当前任务对应的文件
-            for fname in file_names:
-                file_path = os.path.join(save_path, fname)
-                if os.path.exists(file_path):
-                    os.remove(file_path)
+            error_messages.append(f"❌ 下载失败: {str(e)}")
 
-    # 最终清理空目录
+    # 清理空目录（仅当完全没有下载成功时）
     if not downloaded_files:
         if os.path.exists(save_path) and not os.listdir(save_path):
             os.rmdir(save_path)
@@ -159,10 +148,10 @@ def process_auto_mode(download_type):
             success_count += 1
             msg = f"✅ 成功！封面图已下载保存到: {folder_path}"
             if errors:
-                msg += f"\n ⚠️ 部分失败: {', '.join(errors)}"
+                msg += f"\n ⚠️ 部分失败:未找到此番号的某些封面图"
             print(msg)
         else:
-            print(f"❌ 失败！下载失败: {', '.join(errors)}")
+            print(f"❌ 下载失败: 未找到此番号的封面图")
     
     print(f"\n✅ 自动模式完成 {success_count}/{total}")
     input("↩️ 返回主菜单...")
