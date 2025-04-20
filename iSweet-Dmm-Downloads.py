@@ -153,7 +153,7 @@ def process_auto_mode(download_type):
 def process_manual_mode(download_type):
     """处理手动模式"""
     while True:
-        codes_input = input("\n 🆎 请输入产品代码（多个用逗号分隔，输入back返回）: ").strip()
+        codes_input = input("\n 🆎 请输入番号代码（多个用逗号分隔，输入back返回）: ").strip()
         if codes_input.lower() in ('back', 'exit', 'quit'):
             return 'back'
         
@@ -173,7 +173,7 @@ def process_manual_mode(download_type):
                 print(f"❌ 番号格式无效: {code}")
                 continue
             
-            save_dir = os.path.join(os.getcwd(), "DMM_Downloads", code)
+            save_dir = os.path.join(os.getcwd(), "Thumb-Poster-Fanart", code)
             result, msg = download_files(formatted_code, save_dir, download_type)
             if result:
                 success_count += 1
