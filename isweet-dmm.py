@@ -1,0 +1,249 @@
+import os
+import re
+import sys
+import requests
+import tkinter as tk
+from tkinter import filedialog
+
+# 配置请求头
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+                  'AppleWebKit/537.36 (KHTML, like Gecko) '
+                  'Chrome/119.0.0.0 Safari/537.36'
+}
+
+def format_code(raw_code):
+    """格式化产品代码，处理所有后缀和格式"""
+    # 清理数字后的后缀（包括-UMR/-U/-L/-C等）
+    cleaned_code = re.sub(r'(?<=\d)-[A-Za-z-]+$', '', raw_code)
+    
+    # 分离字母和数字部分
+    match = re.match(r'^([a-zA-Z]+)[-]?(\d+)$', cleaned_code)
+    if not match:
+        return None
+    
+    letters = match.group(1).lower()
+    numbers = match.group(2)
+    
+    # 验证数字长度并补零
+    if len(numbers) > 5:
+        return None
+    formatted_num = f"{int(numbers):05d}"
+    
+    return f"{letters}-{formatted_num}"
+
+def download_files(formatted_code, save_path, download_type):
+    """根据下载类型下载并保存文件"""
+    downloaded_files = set()
+    session = requests.Session()
+    retries = requests.adapters.Retry(total=3, backoff_factor=1)
+    session.mount('https://', requests.adapters.HTTPAdapter(max_retries=retries))
+    
+    try:
+        os.makedirs(save_path, exist_ok=True)
+        tasks = []
+
+        # 确定下载任务
+        if download_type in ['poster', 'all']:
+            tasks.append(('ps', ['poster.jpg']))
+        if download_type in ['dual', 'all']:
+            tasks.append(('pl', ['fanart.jpg', 'thumb.jpg']))
+
+        for url_suffix, file_names in tasks:
+            # 构建请求URL
+            dmm_code = formatted_code.replace('-', '')
+            url = f"https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/{dmm_code}/{dmm_code}{url_suffix}.jpg"
+            
+            # 发送请求
+            response = session.get(url, headers=headers, timeout=15)
+            if response.status_code != 200:
+                raise requests.HTTPError(f"未找到此番号的封面图")
+            if len(response.content) < 30720:
+                raise ValueError("文件小于30KB，已丢弃")
+
+            # 保存文件
+            if url_suffix == 'pl':
+                with open(os.path.join(save_path, 'fanart.jpg'), 'wb') as f1, \
+                     open(os.path.join(save_path, 'thumb.jpg'), 'wb') as f2:
+                    for chunk in response.iter_content(1024 * 1024):  # 1MB chunks
+                        f1.write(chunk)
+                        f2.write(chunk)
+                downloaded_files.update(['fanart.jpg', 'thumb.jpg'])
+            else:
+                file_path = os.path.join(save_path, 'poster.jpg')
+                with open(file_path, 'wb') as f:
+                    f.write(response.content)
+                downloaded_files.add('poster.jpg')
+
+        return True, save_path
+
+    except Exception as e:
+        # 清理已下载文件
+        for fname in downloaded_files:
+            file_path = os.path.join(save_path, fname)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        if os.path.exists(save_path) and not os.listdir(save_path):
+            os.rmdir(save_path)
+        return False, str(e)
+
+def get_leaf_folders(path):
+    """获取所有叶子文件夹路径"""
+    folders = []
+    for root, dirs, _ in os.walk(path):
+        if not dirs:
+            folders.append({
+                "raw_name": os.path.basename(root),
+                "full_path": root
+            })
+    return folders
+
+def show_main_menu():
+    """显示主菜单"""
+    print("\n" + " DMM图片下载器模式选择 ".center(50, '='))
+    print("1. 自动模式（从文件夹获取名称）")
+    print("2. 手动模式（手动输入番号代码）")
+    print("3. 退出程序")
+    return input("请选择操作 (1-3): ").strip()
+
+def show_download_menu():
+    """显示下载类型菜单"""
+    print("\n" + " DMM图片下载器主菜单 ".center(50, '='))
+    print("1. 竖版封面图 (Poster)")
+    print("2. 横版封面图 (Thumb+Fanart)")
+    print("3. 全部封面图 (Thumb+Poster+Fanart)")
+    print("4. 返回主菜单")
+    print("5. 退出程序")
+    return input("请选择操作 (1-5): ").strip()
+
+def process_auto_mode(download_type):
+    """处理自动模式"""
+    root = tk.Tk()
+    root.withdraw()
+    source_dir = filedialog.askdirectory(title="选择根目录（取消返回主菜单）")
+    if not source_dir:
+        return 'back'
+    
+    print(f"\n 🟠 正在扫描目录: {os.path.abspath(source_dir)}")
+    folders = get_leaf_folders(source_dir)
+    total = len(folders)
+    success_count = 0
+    
+    for idx, folder in enumerate(folders, 1):
+        raw_name = folder["raw_name"]
+        folder_path = folder["full_path"]
+        print(f"\n [{idx}/{total}] 🟣 正在处理中: {raw_name}")
+        
+        formatted_code = format_code(raw_name)
+        if not formatted_code:
+            print(f"❌ 番号格式无效: {raw_name}")
+            continue
+        
+        result, msg = download_files(formatted_code, folder_path, download_type)
+        if result:
+            success_count += 1
+            print(f"✅ 成功！封面图已下载保存到: {folder_path}")
+        else:
+            print(f"❌ 失败！下载失败: {msg}")
+    
+    print(f"\n✅ 自动模式完成 {success_count}/{total}")
+    input("↩️ 返回主菜单...")
+    return 'success'
+
+def process_manual_mode(download_type):
+    """处理手动模式"""
+    while True:
+        codes_input = input("\n 🆎 请输入产品代码（多个用逗号分隔，输入back返回）: ").strip()
+        if codes_input.lower() in ('back', 'exit', 'quit'):
+            return 'back'
+        
+        codes = [c.strip() for c in codes_input.split(',') if c.strip()]
+        if not codes:
+            print("❌ 未输入有效的番号")
+            continue
+            
+        total = len(codes)
+        success_count = 0
+        
+        for idx, code in enumerate(codes, 1):
+            print(f"\n [{idx}/{total}] 🟣 正在处理中: {code}")
+            
+            formatted_code = format_code(code)
+            if not formatted_code:
+                print(f"❌ 番号格式无效: {code}")
+                continue
+            
+            save_dir = os.path.join(os.getcwd(), "DMM_Downloads", code)
+            result, msg = download_files(formatted_code, save_dir, download_type)
+            if result:
+                success_count += 1
+                print(f"✅ 成功！封面图已下载保存到: {save_dir}")
+            else:
+                print(f"❌ 失败！下载失败: {msg}")
+        
+        print(f"\n✅ 手动模式成功完成 {success_count}/{total}")
+        input("↩️ 按回车继续...")
+        return 'success'
+
+def main():
+    # 系统适配
+    if sys.platform == 'darwin':
+        os.environ['TK_SILENCE_DEPRECATION'] = '1'
+    if sys.platform == 'win32':
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+
+    current_download_type = 'dual'  # 默认下载类型
+    
+    while True:
+        main_choice = show_main_menu()
+        
+        # 退出程序
+        if main_choice == '3':
+            confirm = input("❓ 确认退出程序吗？(y/n): ").lower()
+            if confirm == 'y':
+                print("🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝")
+                sys.exit(0)
+            continue
+            
+        # 初始化下载类型控制标记
+        download_selected = False
+
+        # 下载类型选择
+        while True:
+            dl_choice = show_download_menu()
+            
+            if dl_choice == '4':
+                break  # 返回主菜单
+            elif dl_choice == '5':
+                confirm = input("❓ 确认退出程序吗？(y/n): ").lower()
+                if confirm == 'y':
+                    print("🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝")
+                    sys.exit(0)
+                continue
+            elif dl_choice in ('1', '2', '3'):
+                current_download_type = {
+                    '1': 'poster',
+                    '2': 'dual',
+                    '3': 'all'
+                }[dl_choice]
+                download_selected = True
+                break
+            else:
+                print("❌ 无效输入，请重新选择")
+                continue
+        
+        # 如果用户选择返回则跳过后续处理
+        if not download_selected:
+            continue
+        
+        # 处理模式选择
+        if main_choice == '1':
+            process_auto_mode(current_download_type)
+        elif main_choice == '2':
+            process_manual_mode(current_download_type)
+        else:
+            print("❌ 无效输入，请重新选择")
+
+if __name__ == "__main__":
+    main()
