@@ -46,9 +46,14 @@ def download_files(formatted_code, save_path, download_type):
     downloaded_files = set()
 
     # 配置下载任务
-    if download_type in ['poster', 'all']:
+    if download_type == 'poster':
         tasks.append(('ps', ['poster.jpg']))
-    if download_type in ['dual', 'all']:
+    elif download_type == 'thumb':
+        tasks.append(('pl', ['thumb.jpg']))
+    elif download_type == 'dual':
+        tasks.append(('pl', ['fanart.jpg', 'thumb.jpg']))
+    elif download_type == 'all':
+        tasks.append(('ps', ['poster.jpg']))
         tasks.append(('pl', ['fanart.jpg', 'thumb.jpg']))
 
     for url_suffix, file_names in tasks:
@@ -65,19 +70,12 @@ def download_files(formatted_code, save_path, download_type):
             if len(content) < 30720:
                 raise ValueError(f"文件小于30KB，已丢弃: {url}")
 
-            # 内存校验通过后写入磁盘
-            if url_suffix == 'pl':
-                fanart_path = os.path.join(save_path, 'fanart.jpg')
-                thumb_path = os.path.join(save_path, 'thumb.jpg')
-                with open(fanart_path, 'wb') as f1, open(thumb_path, 'wb') as f2:
-                    f1.write(content)
-                    f2.write(content)
-                downloaded_files.update(['fanart.jpg', 'thumb.jpg'])
-            else:
-                poster_path = os.path.join(save_path, 'poster.jpg')
-                with open(poster_path, 'wb') as f:
+            # 写入文件
+            for file_name in file_names:
+                file_path = os.path.join(save_path, file_name)
+                with open(file_path, 'wb') as f:
                     f.write(content)
-                downloaded_files.add('poster.jpg')
+                downloaded_files.add(file_name)
 
         except requests.exceptions.HTTPError:
             error_messages.append(f" ❌ 未找到此番号的封面图")
@@ -111,14 +109,15 @@ def show_main_menu():
     return input("请选择操作 (1-3): ").strip()
 
 def show_download_menu():
-    """显示下载类型菜单"""
+    """显示下载类型菜单（已按新要求调整）"""
     print("\n" + " iSweet_Dmm_图片下载器主菜单 ".center(50, '='))
-    print("1. 竖版封面图 (Poster)")
-    print("2. 横版封面图 (Thumb+Fanart)")
-    print("3. 全部封面图 (Thumb+Poster+Fanart)")
-    print("4. 返回主菜单")
-    print("5. 退出程序")
-    return input("请选择操作 (1-5): ").strip()
+    print("1. 竖版海报图 (Poster)")
+    print("2. 横版缩略图 (Thumb)")
+    print("3. 缩略图+背景图 (Thumb+Fanart)")
+    print("4. 全部封面图 (Thumb+Poster+Fanart)")
+    print("5. 返回主菜单")
+    print("6. 退出程序")
+    return input("请选择操作 (1-6): ").strip()
 
 def process_auto_mode(download_type):
     """处理自动模式"""
@@ -241,19 +240,20 @@ def main():
         while True:
             dl_choice = show_download_menu()
             
-            if dl_choice == '4':
+            if dl_choice == '5':
                 break  # 返回主菜单
-            elif dl_choice == '5':
+            elif dl_choice == '6':
                 confirm = input("\n ❓ 确认退出程序吗？(y/n): ").lower()
                 if confirm == 'y':
                     print("\n 🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝")
                     sys.exit(0)
                 continue
-            elif dl_choice in ('1', '2', '3'):
+            elif dl_choice in ('1', '2', '3', '4'):
                 current_download_type = {
                     '1': 'poster',
-                    '2': 'dual',
-                    '3': 'all'
+                    '2': 'thumb',
+                    '3': 'dual',
+                    '4': 'all'
                 }[dl_choice]
                 download_selected = True
                 break
