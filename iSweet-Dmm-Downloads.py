@@ -80,9 +80,9 @@ def download_files(formatted_code, save_path, download_type):
                 downloaded_files.add('poster.jpg')
 
         except requests.exceptions.HTTPError:
-            error_messages.append(f"❌ 未找到此番号的封面图")
+            error_messages.append(f" ❌ 未找到此番号的封面图")
         except Exception as e:
-            error_messages.append(f"❌ 下载失败: {str(e)}")
+            error_messages.append(f" ❌ 下载失败: {str(e)}")
 
     # 清理空目录（仅当完全没有下载成功时）
     if not downloaded_files:
@@ -104,7 +104,7 @@ def get_leaf_folders(path):
 
 def show_main_menu():
     """显示主菜单"""
-    print("\n" + " DMM图片下载器模式选择 ".center(50, '='))
+    print("\n" + " iSweet_Dmm_图片下载器模式选择 ".center(50, '='))
     print("1. 自动模式（从文件夹获取名称）")
     print("2. 手动模式（手动输入番号代码）")
     print("3. 退出程序")
@@ -112,7 +112,7 @@ def show_main_menu():
 
 def show_download_menu():
     """显示下载类型菜单"""
-    print("\n" + " DMM图片下载器主菜单 ".center(50, '='))
+    print("\n" + " iSweet_Dmm_图片下载器主菜单 ".center(50, '='))
     print("1. 竖版封面图 (Poster)")
     print("2. 横版封面图 (Thumb+Fanart)")
     print("3. 全部封面图 (Thumb+Poster+Fanart)")
@@ -128,71 +128,89 @@ def process_auto_mode(download_type):
     if not source_dir:
         return 'back'
     
-    print(f"\n 🟠 正在扫描目录: {os.path.abspath(source_dir)}")
+    print(f"\n ⏳ 正在扫描目录: {os.path.abspath(source_dir)}")
     folders = get_leaf_folders(source_dir)
     total = len(folders)
     success_count = 0
-    
+    partial_count = 0
+    fail_count = 0
+
     for idx, folder in enumerate(folders, 1):
         raw_name = folder["raw_name"]
         folder_path = folder["full_path"]
-        print(f"\n [{idx}/{total}] 🟣 正在处理中: {raw_name}")
+        print(f"\n 🔍 正在处理: [{idx}/{total}] {raw_name}")
         
         formatted_code = format_code(raw_name)
         if not formatted_code:
-            print(f"❌ 番号格式无效: {raw_name}")
+            print(f" ❌ 番号格式无效: {raw_name}")
+            fail_count += 1
             continue
         
         result, errors = download_files(formatted_code, folder_path, download_type)
         if result:
             success_count += 1
-            msg = f"✅ 成功！封面图已下载保存到: {folder_path}"
+            msg = f" ✅ 下载成功！封面图已保存到: {folder_path}"
             if errors:
-                msg += f"\n ⚠️ 部分失败:未找到此番号的某些封面图"
+                partial_count += 1
+                msg += f" ⚠️ 部分失败:未找到此番号的某些封面图"
             print(msg)
         else:
-            print(f"❌ 下载失败: 未找到此番号的封面图")
-    
-    print(f"\n✅ 自动模式完成 {success_count}/{total}")
-    input("↩️ 返回主菜单...")
+            print(f" ❌ 下载失败: 未找到此番号的封面图")
+            fail_count += 1
+
+    print(f"\n ✅ 自动模式完成")
+    print(f" 🟩 成功下载: {success_count}")
+    print(f" 🟧 部分失败: {partial_count}")
+    print(f" 🟥 完全失败: {fail_count}")
+    print(f" 🟦 合计处理: {total}")
+    input("\n ↩️  返回主菜单...")
     return 'success'
 
 def process_manual_mode(download_type):
     """处理手动模式"""
     while True:
-        codes_input = input("\n 🆎 请输入番号代码（多个用逗号分隔，输入back返回）: ").strip()
+        codes_input = input(" 🆎 请输入番号代码（多个用逗号分隔，输入back返回）: ").strip()
         if codes_input.lower() in ('back', 'exit', 'quit'):
             return 'back'
         
         codes = [c.strip() for c in codes_input.split(',') if c.strip()]
         if not codes:
-            print("❌ 未输入有效的番号")
+            print(" ❌ 未输入有效的番号")
             continue
             
         total = len(codes)
         success_count = 0
+        partial_count = 0
+        fail_count = 0
         
         for idx, code in enumerate(codes, 1):
-            print(f"\n [{idx}/{total}] 🟣 正在处理中: {code}")
+            print(f"\n 🔍 正在处理: [{idx}/{total}] {code}")
             
             formatted_code = format_code(code)
             if not formatted_code:
-                print(f"❌ 番号格式无效: {code}")
+                print(f" ❌ 番号格式无效: {code}")
+                fail_count += 1
                 continue
             
             save_dir = os.path.join(os.getcwd(), "Thumb-Poster-Fanart", code)
             result, errors = download_files(formatted_code, save_dir, download_type)
             if result:
                 success_count += 1
-                msg = f"✅ 成功！封面图已下载保存到: {save_dir}"
+                msg = f" ✅ 成功！封面图已下载保存到: {save_dir}"
                 if errors:
-                    msg += f"\n ⚠️ 部分失败: {', '.join(errors)}"
+                    partial_count += 1
+                    msg += f" ⚠️ 部分失败: {', '.join(errors)}"
                 print(msg)
             else:
-                print(f"❌ 失败！下载失败: {', '.join(errors)}")
-        
-        print(f"\n✅ 手动模式成功完成 {success_count}/{total}")
-        input("↩️ 按回车继续...")
+                print(f" ❌ 失败！下载失败: {', '.join(errors)}")
+                fail_count += 1
+
+        print(f"\n ✅ 手动模式成功完成 {success_count}/{total}")
+        print(f" 🟩 成功下载: {success_count}")
+        print(f" 🟧 部分失败: {partial_count}")
+        print(f" 🟥 完全失败: {fail_count}")
+        print(f" 🟦 合计处理: {total}")
+        input("\n ↩️  返回主菜单...")
         return 'success'
 
 def main():
@@ -210,9 +228,9 @@ def main():
         
         # 退出程序
         if main_choice == '3':
-            confirm = input("❓ 确认退出程序吗？(y/n): ").lower()
+            confirm = input("\n ❓ 确认退出程序吗？(y/n): ").lower()
             if confirm == 'y':
-                print("🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝")
+                print("\n 🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝")
                 sys.exit(0)
             continue
             
@@ -226,9 +244,9 @@ def main():
             if dl_choice == '4':
                 break  # 返回主菜单
             elif dl_choice == '5':
-                confirm = input("❓ 确认退出程序吗？(y/n): ").lower()
+                confirm = input("\n ❓ 确认退出程序吗？(y/n): ").lower()
                 if confirm == 'y':
-                    print("🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝")
+                    print("\n 🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝")
                     sys.exit(0)
                 continue
             elif dl_choice in ('1', '2', '3'):
