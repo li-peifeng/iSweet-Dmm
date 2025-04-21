@@ -104,21 +104,22 @@ def get_leaf_folders(path):
 def show_main_menu():
     """显示主菜单"""
     print("\n" + " iSweet_Dmm_图片下载器模式选择 ".center(50, '='))
-    print("1. 自动模式（从文件夹获取名称）")
-    print("2. 手动模式（手动输入番号代码）")
+    print("\n\n1. 自动模式（从末级文件夹名自动批量获取番号）")
+    print("2. 手动模式（手动输入番号，多个用逗号分隔）")
     print("3. 退出程序")
-    return input("请选择操作 (1-3): ").strip()
+    return input("\n\n请输入数字进行选择 (1-3): ").strip()
 
 def show_download_menu():
     """显示下载类型菜单（已按新要求调整）"""
     print("\n" + " iSweet_Dmm_图片下载器主菜单 ".center(50, '='))
-    print("1. 竖版海报图 (Poster)")
+    print("\n\n1. 竖版海报图 (Poster)")
     print("2. 横版缩略图 (Thumb)")
     print("3. 横版缩略图+背景图 (Thumb+Fanart)")
     print("4. 全部3种封面图 (Thumb+Poster+Fanart)")
     print("5. 返回主菜单")
     print("6. 退出程序")
-    return input("请选择操作 (1-6): ").strip()
+    print("\n注：1/3/4选项适合不加水印，2适合加水印")
+    return input("\n\n请输入数字进行选择 (1-6): ").strip()
 
 def process_auto_mode(download_type):
     """处理自动模式"""
@@ -158,12 +159,12 @@ def process_auto_mode(download_type):
             print(f" ❌ 下载失败: 未找到此番号的封面图")
             fail_count += 1
 
-    print(f"\n ✅ 自动模式完成")
+    print(f"\n\n ✅ 自动模式完成")
     print(f" 🟩 成功下载: {success_count}")
     print(f" 🟧 部分失败: {partial_count}")
     print(f" 🟥 完全失败: {fail_count}")
     print(f" 🟦 合计处理: {total}")
-    input("\n ↩️  返回主菜单...")
+    input("\n\n ↩️  返回主菜单...")
     return 'success'
 
 def process_manual_mode(download_type):
@@ -205,12 +206,12 @@ def process_manual_mode(download_type):
                 print(f" ❌ 失败！下载失败: {', '.join(errors)}")
                 fail_count += 1
 
-        print(f"\n ✅ 手动模式成功完成 {success_count}/{total}")
+        print(f"\n\n ✅ 手动模式成功完成 {success_count}/{total}")
         print(f" 🟩 成功下载: {success_count}")
         print(f" 🟧 部分失败: {partial_count}")
         print(f" 🟥 完全失败: {fail_count}")
         print(f" 🟦 合计处理: {total}")
-        input("\n ↩️  返回主菜单...")
+        input("\n\n ↩️  返回主菜单...")
         return 'success'
 
 def main():
@@ -228,9 +229,9 @@ def main():
         
         # 退出程序
         if main_choice == '3':
-            confirm = input("\n ❓ 确认退出程序吗？(y/n): ").lower()
+            confirm = input("\n\n ❓ 确认退出程序吗？(y/n): ").lower()
             if confirm == 'y':
-                print("\n 🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝")
+                print("\n\n 🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝 \n\n")
                 sys.exit(0)
             continue
             
@@ -244,9 +245,9 @@ def main():
             if dl_choice == '5':
                 break  # 返回主菜单
             elif dl_choice == '6':
-                confirm = input("\n ❓ 确认退出程序吗？(y/n): ").lower()
+                confirm = input("\n\n ❓ 确认退出程序吗？(y/n): ").lower()
                 if confirm == 'y':
-                    print("\n 🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝")
+                    print("\n\n 🌐 PeiFeng.Li 祝你使用愉快，拜拜！💝 \n\n")
                     sys.exit(0)
                 continue
             elif dl_choice in ('1', '2', '3', '4'):
