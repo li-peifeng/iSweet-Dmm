@@ -1,3 +1,4 @@
+# iSweet_Dmm_图片下载器 By PeiFeng.Li
 import os
 import re
 import sys
