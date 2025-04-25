@@ -1,4 +1,4 @@
-<a href="https://peifeng.li"><img width="100px" alt="logo" src="https://is.peifeng.li/logo.png"/></a>
+<a href="https://peifeng.li"><img width="100px" alt="logo" src="https://li-peifeng.github.io/logo.png"/></a>
 
 ## 此脚本可以自动下载 DMM 的 JAV 封面
 ### 主要功能
