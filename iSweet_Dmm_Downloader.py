@@ -103,7 +103,7 @@ def get_leaf_folders(path):
 
 def show_main_menu():
     """显示主菜单"""
-    print("\n" + " iSweet_Dmm_图片下载器模式选择 ".center(50, '='))
+    print("\n\n\n" + " iSweet_Dmm_图片下载器模式选择 ".center(50, '='))
     print("\n\n1. 自动模式（从末级文件夹名自动批量获取番号）")
     print("2. 手动模式（手动输入番号，多个用逗号分隔）")
     print("3. 退出程序")
@@ -111,7 +111,7 @@ def show_main_menu():
 
 def show_download_menu():
     """显示下载类型菜单（已按新要求调整）"""
-    print("\n" + " iSweet_Dmm_图片下载器主菜单 ".center(50, '='))
+    print("\n\n\n" + " iSweet_Dmm_图片下载器主菜单 ".center(50, '='))
     print("\n\n1. 竖版海报图 (Poster)")
     print("2. 横版缩略图 (Thumb)")
     print("3. 横版缩略图+背景图 (Thumb+Fanart)")
