@@ -68,8 +68,8 @@ def download_files(formatted_code, save_path, download_type):
             
             # 内存校验
             content = response.content
-            if len(content) < 30720:
-                raise ValueError(f"文件小于30KB，已丢弃: {url}")
+            if len(content) < 307200:
+                raise ValueError(f"文件小于300KB，已丢弃: {url}")
 
             # 写入文件
             for file_name in file_names:
