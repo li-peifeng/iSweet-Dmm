@@ -1,4 +1,5 @@
 # iSweet_Dmm_图片下载器 By PeiFeng.Li
+
 import os
 import re
 import sys
@@ -17,6 +18,17 @@ headers = {
 
 def format_code(raw_code):
     """格式化产品代码，处理所有后缀和格式"""
+    # 处理特定前缀（不区分大小写）
+    lower_code = raw_code.lower()
+    if lower_code.startswith('star'):
+        raw_code = '1' + raw_code.lower()  # 转为小写并添加1
+    elif lower_code.startswith('start'):
+        raw_code = '1' + raw_code.lower()  # 转为小写并添加1
+    elif lower_code.startswith('stars'):
+        raw_code = '1' + raw_code.lower()  # 转为小写并添加1
+    elif lower_code.startswith('sods'):
+        raw_code = '1' + raw_code.lower()  # 转为小写并添加1
+    
     # 清理数字后的后缀（包括-UMR/-U/-L/-C等）
     cleaned_code = re.sub(r'(?<=\d)-[A-Za-z-]+$', '', raw_code)
     
@@ -25,7 +37,7 @@ def format_code(raw_code):
     if not match:
         return None
     
-    letters = match.group(1).lower()
+    letters = match.group(1).lower()  # 确保字母部分为小写
     numbers = match.group(2)
     
     # 验证数字长度并补零
@@ -45,14 +57,16 @@ def download_files(formatted_code, save_path, download_type):
     tasks = []
     error_messages = []
     downloaded_files = set()
+    skipped_files = set()
 
-    # 配置下载任务
+    # 配置下载任务（已修改选项3的任务）
     if download_type == 'poster':
         tasks.append(('ps', ['poster.jpg']))
     elif download_type == 'thumb':
         tasks.append(('pl', ['thumb.jpg']))
-    elif download_type == 'dual':
-        tasks.append(('pl', ['fanart.jpg', 'thumb.jpg']))
+    elif download_type == 'dual':  # 修改后的选项3
+        tasks.append(('pl', ['thumb.jpg']))
+        tasks.append(('ps', ['poster.jpg']))
     elif download_type == 'all':
         tasks.append(('ps', ['poster.jpg']))
         tasks.append(('pl', ['fanart.jpg', 'thumb.jpg']))
@@ -68,27 +82,53 @@ def download_files(formatted_code, save_path, download_type):
             
             # 内存校验
             content = response.content
-            if len(content) < 307200:
-                raise ValueError(f"文件小于300KB，已丢弃: {url}")
+            if len(content) < 204800:
+                raise ValueError(f"文件小于200KB，已丢弃: {url}")
 
-            # 写入文件
+            # 写入文件（添加文件存在检查逻辑）
             for file_name in file_names:
                 file_path = os.path.join(save_path, file_name)
-                with open(file_path, 'wb') as f:
-                    f.write(content)
-                downloaded_files.add(file_name)
+                
+                # 检查文件是否已存在
+                if os.path.exists(file_path):
+                    existing_size = os.path.getsize(file_path)
+                    new_size = len(content)
+                    
+                    # 比较文件大小（新文件需大于旧文件至少100KB才覆盖）
+                    if new_size > existing_size + 102400:  # 100KB = 102400 bytes
+                        with open(file_path, 'wb') as f:
+                            f.write(content)
+                        downloaded_files.add(file_name)
+                        print(f" ✅ 已覆盖（新文件更大）: {file_name}")
+                    else:
+                        skipped_files.add(file_name)
+                        print(f" ⏭️ 已跳过（文件大小不足100KB差异）: {file_name}")
+                else:
+                    with open(file_path, 'wb') as f:
+                        f.write(content)
+                    downloaded_files.add(file_name)
+                    print(f" ✅ 已下载: {file_name}")
 
         except requests.exceptions.HTTPError:
             error_messages.append(f" ❌ 未找到此番号的封面图")
         except Exception as e:
             error_messages.append(f" ❌ 下载失败: {str(e)}")
 
+    # 生成最终结果消息
+    result_messages = []
+    if downloaded_files:
+        result_messages.append(f" ✅ 成功下载/覆盖: {', '.join(downloaded_files)}")
+    if skipped_files:
+        result_messages.append(f" ⏭️ 已跳过保留: {', '.join(skipped_files)}")
+    if error_messages:
+        result_messages.extend(error_messages)
+
     # 清理空目录（仅当完全没有下载成功时）
-    if not downloaded_files:
+    if not downloaded_files and not skipped_files:
         if os.path.exists(save_path) and not os.listdir(save_path):
             os.rmdir(save_path)
-        return False, error_messages
-    return True, error_messages
+        return False, result_messages
+    return True, result_messages
 
 def get_leaf_folders(path):
     """获取所有叶子文件夹路径"""
@@ -114,7 +154,7 @@ def show_download_menu():
     print("\n\n\n" + " iSweet_Dmm_图片下载器主菜单 ".center(50, '='))
     print("\n\n1. 竖版海报图 (Poster)")
     print("2. 横版缩略图 (Thumb)")
-    print("3. 横版缩略图+背景图 (Thumb+Fanart)")
+    print("3. 横版缩略图+海报图 (Thumb+Poster)")
     print("4. 全部3种封面图 (Thumb+Poster+Fanart)")
     print("5. 返回主菜单")
     print("6. 退出程序")
