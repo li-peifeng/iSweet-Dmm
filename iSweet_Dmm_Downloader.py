@@ -135,10 +135,20 @@ def get_leaf_folders(path):
     folders = []
     for root, dirs, _ in os.walk(path):
         if not dirs:
-            folders.append({
-                "raw_name": os.path.basename(root),
-                "full_path": root
-            })
+            # 检查是否是extrafanart文件夹
+            if "extrafanart" in root.lower():
+                # 使用extrafanart的父文件夹名
+                parent_dir = os.path.dirname(root)
+                raw_name = os.path.basename(parent_dir)
+                folders.append({
+                    "raw_name": raw_name,
+                    "full_path": parent_dir  # 使用父文件夹路径而不是extrafanart路径
+                })
+            else:
+                folders.append({
+                    "raw_name": os.path.basename(root),
+                    "full_path": root
+                })
     return folders
 
 def show_main_menu():
